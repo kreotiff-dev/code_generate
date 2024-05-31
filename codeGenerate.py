@@ -6,17 +6,24 @@ import string
 import psycopg2
 import json
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Загрузка переменных окружения из файла .env
+load_dotenv()
+
+# Определение среды (development или production)
+ENV = os.getenv('ENV', 'development')
 
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Подключение к базе данных PostgreSQL
 conn = psycopg2.connect(
-    user='postgres',
-    password='',
-    host='localhost',
-    database='postgres',
-    port=5432
+    user=os.getenv('DB_USER'),
+    password=os.getenv('DB_PASSWORD'),
+    host=os.getenv('DB_HOST'),
+    database=os.getenv('DB_NAME'),
+    port=os.getenv('DB_PORT')
 )
 print("Успешное подключение к базе данных")
 c = conn.cursor()
@@ -50,11 +57,10 @@ def save_code(code, app_id, user_phone):
     except Exception as e:
         logging.error("Произошла ошибка при сохранении кода: %s", str(e))
 
-
 # Функция для обновления confirmcode и вывода SQL-запроса в консоль
 def update_user_confirm_code(code, user_phone):
     try:
-        sql_query = "UPDATE users SET confirmcode = %s WHERE phone = '%s'" % (code, user_phone)
+        sql_query = "UPDATE users SET confirm_code = %s WHERE phone = '%s'" % (code, user_phone)
         print("SQL-запрос для обновления confirmcode:", sql_query)
 
         # Выполнение SQL-запроса
@@ -66,8 +72,8 @@ def update_user_confirm_code(code, user_phone):
 # Отправка через RabbitMQ
 def send_code(code, correlation_id, reply_to):
     print(f"Отправка кода через RabbitMQ - Код: {code}, Correlation ID: {correlation_id}, Reply To: {reply_to}")
-    credentials = pika.PlainCredentials('admin', '123456')
-    parameters = pika.ConnectionParameters('37.46.129.245', 5672, '/', credentials)
+    credentials = pika.PlainCredentials(os.getenv('RABBITMQ_USERNAME'), os.getenv('RABBITMQ_PASSWORD'))
+    parameters = pika.ConnectionParameters(os.getenv('RABBITMQ_HOST'), int(os.getenv('RABBITMQ_PORT')), '/', credentials)
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
     channel.basic_publish(
@@ -85,13 +91,11 @@ def send_code(code, correlation_id, reply_to):
 
     connection.close()
 
-
 # Обновляем статус использования кода в базе данных
 def update_code_usage(code_id):
     print(f"Обновление статуса использования кода - ID: {code_id}")
-    c.execute("UPDATE codes SET used = 1 WHERE id = ?", (code_id,))
+    c.execute("UPDATE codes SET used = 1 WHERE id = %s", (code_id,))
     conn.commit()
-
 
 # Обработчик сообщений из очереди запросов
 def callback(ch, method, properties, body):
@@ -127,84 +131,9 @@ def callback(ch, method, properties, body):
     except Exception as e:
         print("Ошибка при обработке сообщения:", str(e))
 
-
 # Подключение к RabbitMQ
-credentials = pika.PlainCredentials('admin', '123456')
-parameters = pika.ConnectionParameters('37.46.129.245', credentials=credentials)
-connection = pika.BlockingConnection(parameters)
-channel = connection.channel()
-
-# Объявляем очередь запросов
-channel.queue_declare(queue='code_requests', durable=True)
-
-# Подписываемся на очередь запросов
-channel.basic_consume(queue='code_requests', on_message_callback=callback)
-
-print('Сервис генерации кодов запущен. Ожидание запросов...')
-
-# Запуск бесконечного цикла ожидания сообщений
-channel.start_consuming()
-
-
-
-# Отправка через RabbitMQ
-def send_code(code, correlation_id, reply_to):
-    print(f"Отправка кода через RabbitMQ - Код: {code}, Correlation ID: {correlation_id}, Reply To: {reply_to}")
-    credentials = pika.PlainCredentials('admin', '123456')
-    parameters = pika.ConnectionParameters('37.46.129.245', 5672, '/', credentials)
-    connection = pika.BlockingConnection(parameters)
-    channel = connection.channel()
-    channel.basic_publish(
-        exchange='sms.code',
-        routing_key='response',
-        body=code,
-        properties=pika.BasicProperties(
-            app_id='1234',
-            correlation_id=str(correlation_id),
-            reply_to=str(reply_to)
-        )
-    )
-
-    print("Код успешно отправлен")
-
-    connection.close()
-
-
-# Обновляем статус использования кода в базе данных
-def update_code_usage(code_id):
-    print(f"Обновление статуса использования кода - ID: {code_id}")
-    c.execute("UPDATE codes SET used = 1 WHERE id = ?", (code_id,))
-    conn.commit()
-
-
-# Обработчик сообщений из очереди запросов
-def callback(ch, method, properties, body):
-    app_id = None
-    if properties is not None and properties.headers is not None:
-        app_id = properties.headers.get('app_id')
-
-    if app_id is not None:
-        print(f"Получено сообщение из очереди - App ID: {app_id}")
-    else:
-        print("App ID не найден в заголовках сообщения")
-
-    # Генерируем код
-    code = generate_code()
-    print("Сгенерирован код:", code)
-
-    # Сохраняем код в базе данных
-    save_code(code, app_id)
-
-    # Отправляем код в ответ в очередь ответов
-    send_code(code, properties.correlation_id, properties.reply_to)
-
-    # Подтверждаем получение сообщения
-    ch.basic_ack(delivery_tag=method.delivery_tag)
-
-
-# Подключение к RabbitMQ
-credentials = pika.PlainCredentials('admin', '123456')
-parameters = pika.ConnectionParameters('37.46.129.245', credentials=credentials)
+credentials = pika.PlainCredentials(os.getenv('RABBITMQ_USERNAME'), os.getenv('RABBITMQ_PASSWORD'))
+parameters = pika.ConnectionParameters(os.getenv('RABBITMQ_HOST'), int(os.getenv('RABBITMQ_PORT')), '/', credentials)
 connection = pika.BlockingConnection(parameters)
 channel = connection.channel()
 
