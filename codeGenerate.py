@@ -63,12 +63,19 @@ if empty_vars:
 logging.info("Все необходимые переменные окружения присутствуют и заполнены")
 print("Все необходимые переменные окружения присутствуют и заполнены")
 
+# Определение глобальных переменных
+conn = None
+rabbitmq_connection = None
+
 
 # Обработчик сигналов для корректного завершения работы скрипта
 def signal_handler(sig, frame):
-    logging.info("Получен сигнал прерывания. Завершение работы...")
+    global conn
+    global rabbitmq_connection
+
     if conn:
         conn.close()
+
     if rabbitmq_connection and not rabbitmq_connection.is_closed:
         rabbitmq_connection.close()
     sys.exit(0)
