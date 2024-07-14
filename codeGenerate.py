@@ -76,7 +76,7 @@ def signal_handler(sig, frame):
     if conn:
         conn.close()
 
-    if rabbitmq_connection and not rabbitmq_connection.is_closed:
+    if rabbitmq_connection is not None and not rabbitmq_connection.is_closed:
         rabbitmq_connection.close()
     sys.exit(0)
 
@@ -98,6 +98,7 @@ try:
     print("Успешное подключение к базе данных")
 except Exception as e:
     logging.error(f"Ошибка подключения к базе данных: {e}")
+    conn = None
     raise
 
 # Создание таблицы codes, если она еще не существует
@@ -244,6 +245,7 @@ try:
     print("Успешное подключение к RabbitMQ")
 except Exception as e:
     logging.error(f"Ошибка подключения к RabbitMQ: {e}")
+    rabbitmq_connection = None
     raise
 
 try:
