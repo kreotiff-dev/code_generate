@@ -162,7 +162,7 @@ def send_code(code, correlation_id, reply_to):
     logging.info(f"Отправка кода через RabbitMQ - Код: {code}, Correlation ID: {correlation_id}, Reply To: {reply_to}")
     print(f"Отправка кода через RabbitMQ - Код: {code}, Correlation ID: {correlation_id}, Reply To: {reply_to}")
     credentials = pika.PlainCredentials(os.getenv('RABBITMQ_USERNAME'), os.getenv('RABBITMQ_PASSWORD'))
-    parameters = pika.ConnectionParameters(os.getenv('RABBITMQ_HOST'), int(os.getenv('RABBITMQ_PORT')), '/', credentials)
+    parameters = pika.ConnectionParameters(os.getenv('RABBITMQ_HOST'), int(os.getenv('RABBITMQ_PORT')), 'gbank', credentials)
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
     channel.basic_publish(
