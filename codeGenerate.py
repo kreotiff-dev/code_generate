@@ -166,8 +166,8 @@ def send_code(code, correlation_id, reply_to):
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
     channel.basic_publish(
-        exchange='sms.code',
-        routing_key='response',
+        exchange='gbank_exchange',
+        routing_key='verification.code.response',
         body=code,
         properties=pika.BasicProperties(
             app_id='1234',
@@ -235,6 +235,7 @@ try:
     rabbitmq_connection = pika.BlockingConnection(pika.ConnectionParameters(
         host=os.getenv('RABBITMQ_HOST'),
         port=int(os.getenv('RABBITMQ_PORT')),
+        virtual_host='gbank',
         credentials=pika.PlainCredentials(
             os.getenv('RABBITMQ_USERNAME'),
             os.getenv('RABBITMQ_PASSWORD')
@@ -250,10 +251,10 @@ except Exception as e:
 
 try:
     # Объявляем очередь запросов
-    channel.queue_declare(queue='code_requests', durable=True)
+    channel.queue_declare(queue='verification_code_requests', durable=True)
 
     # Подписываемся на очередь запросов
-    channel.basic_consume(queue='code_requests', on_message_callback=callback)
+    channel.basic_consume(queue='verification_code_requests', on_message_callback=callback)
     logging.info("Сервис успешно запущен. Ожидание запросов...")
     print("Сервис успешно запущен. Ожидание запросов...")
     channel.start_consuming()
